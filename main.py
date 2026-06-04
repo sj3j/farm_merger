@@ -13,8 +13,7 @@ import math
 # 🌟 قاموس التتابعات (COLLECT SEQUENCES) 🌟
 # =====================================================================
 COLLECT_SEQUENCES = {
-    "exclamation1": ["make.png", "exclamation1.png", "make.png", "check.png", "close.png"],
-    "exclamation": ["make.png", "exclamation.png", "make.png", "check.png", "close.png"]
+    "exclamation": ["make.png", "exclamation1.png", "make.png", "check.png", "close.png"]
 }
 
 # Set up argument parser
