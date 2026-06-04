@@ -38,12 +38,14 @@ class TemplateCapturer:
                 if self.roi_start and self.roi_end:
                     x1, y1 = self.roi_start
                     x2, y2 = self.roi_end
-                    if abs(x2 - x1) > 20 and abs(y2 - y1) > 20:
+                    # 🌟 التعديل هنا: تم تغيير 20 إلى 5 للسماح بالقصات الصغيرة جداً 🌟
+                    if abs(x2 - x1) > 5 and abs(y2 - y1) > 5:
                         print("\n🛑 Box drawn! Check the console to name your item.")
                         self.state = "WAITING_INPUT"
                     else:
+                        print("⚠️ Box was too small! Try drawing a slightly bigger one.")
                         self.roi_start = None
-                        self.roi_end = None
+                        self.roi_end = Nonecolgo
 
     def capture_screen(self) -> np.ndarray:
         """Captures the primary monitor using mss."""
@@ -138,13 +140,13 @@ class TemplateCapturer:
         filename = f"{name}.png" if tier == "1" else f"{name}{tier}.png"
         
         # إصلاح دمج المسارات لتجنب مشاكل علامة (\)
-        save_path = os.path.join("farm_merger\\collect", filename)
+        save_path = os.path.join("collect", filename)
         
         cv2.imwrite(save_path, final_img)
         print(f"✅ Saved exact template to: {save_path}")
 
 if __name__ == "__main__":
-    if not os.path.exists("farm_merger\\collect"):
-        os.makedirs("farm_merger\\collect")
+    if not os.path.exists("collect"):
+        os.makedirs("collect")
     capturer = TemplateCapturer()
     capturer.run()

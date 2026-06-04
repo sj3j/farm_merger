@@ -9,6 +9,16 @@ import numpy as np
 import argparse
 import math
 
+# =====================================================================
+# 🌟 قاموس التتابعات (COLLECT SEQUENCES) 🌟
+# هنا تحدد ما هي الأزرار التي يجب الضغط عليها بعد جمع عنصر معين.
+# (يجب أن تكون صور الأزرار محفوظة داخل مجلد collect بنفس هذه الأسماء)
+# =====================================================================
+COLLECT_SEQUENCES = {
+    #"check": ["confirm.png"],
+    "exclamation": ["make.png","check.png","claim.png","exclamation.png","make.png", "close.png"]
+}
+
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Farm Merge Clicker')
 parser.add_argument('--merge_count', type=int, default=5, help='Number of items to merge')
@@ -59,6 +69,72 @@ def get_image_file_paths(folder_name='img'):
     return image_files
 
 
+# =====================================================================
+# 🌟 دالة الجمع التلقائي الذكية (تتعرف على التتابعات) 🌟
+# =====================================================================
+def perform_auto_collect(start_x, start_y, end_x, end_y, base_dir):
+    collect_files = get_image_file_paths('collect')
+    if not collect_files:
+        print("No images found in 'collect' folder.")
+        return False
+        
+    # جمع أسماء صور الخطوات (مثل confirm.png) لتجاهلها في البحث الأساسي
+    sequence_steps = []
+    for steps in COLLECT_SEQUENCES.values():
+        sequence_steps.extend(steps)
+        
+    collected_something = False
+    
+    for collect_img in collect_files:
+        base_name = os.path.basename(collect_img).lower()
+        
+        # تخطي أزرار الخطوات (لا تنقر على confirm العشوائي قبل أن تنقر على العملة)
+        if base_name in sequence_steps:
+            continue
+            
+        locs, _ = ImageFinder.find_image_on_screen(
+            collect_img, start_x, start_y, end_x, end_y, resize_factor=1.0, threshold=0.75
+        )
+        
+        for loc in locs:
+            curr_x, curr_y = loc
+            pyautogui.moveTo(curr_x, curr_y)
+            pyautogui.mouseDown()
+            pyautogui.moveTo(curr_x + 2, curr_y + 2, duration=0.05)
+            pyautogui.mouseUp()
+            pyautogui.sleep(0.5) # انتظار ظهور النافذة المنبثقة
+            collected_something = True
+            print(f"[Collect] Picked up: {base_name}")
+            
+            # فحص ما إذا كان هذا العنصر يحتاج إلى خطوات إضافية (تتابع)
+            for key, steps in COLLECT_SEQUENCES.items():
+                if key in base_name: # مثلاً إذا كان اسم الملف "coin1.png" فهو يتطابق مع مفتاح "coin"
+                    for step_img_name in steps:
+                        step_path = os.path.join(base_dir, 'collect', step_img_name)
+                        if not os.path.exists(step_path):
+                            print(f"[Warning] Missing sequence image: {step_img_name}")
+                            continue
+                            
+                        # البحث عن زر الخطوة (مثل confirm.png) لمدة تصل إلى ثانيتين
+                        print(f"   -> Waiting for sequence step: {step_img_name}...")
+                        for attempt in range(4): 
+                            step_locs, _ = ImageFinder.find_image_on_screen(
+                                step_path, start_x, start_y, end_x, end_y, resize_factor=1.0, threshold=0.75
+                            )
+                            if step_locs:
+                                sx, sy = step_locs[0]
+                                pyautogui.moveTo(sx, sy)
+                                pyautogui.mouseDown()
+                                pyautogui.moveTo(sx + 2, sy + 2, duration=0.05)
+                                pyautogui.mouseUp()
+                                pyautogui.sleep(0.5) # انتظار استجابة الزر
+                                print(f"   -> Clicked: {step_img_name}")
+                                break
+                            pyautogui.sleep(0.5)
+                            
+    return collected_something
+
+
 if __name__ == "__main__":
     def on_press(key):
         if key == keyboard.Key.f1:
@@ -97,13 +173,13 @@ if __name__ == "__main__":
     image_files = get_image_file_paths('img')
     
     total_merges_pending = 0
+    idle_cycles = 0
     
     center_x = screen_start_x + (screen_end_x - screen_start_x) // 2
     center_y = screen_start_y + (screen_end_y - screen_start_y) // 2
     
-    # 🌟 Shift the entire drag zone UP to avoid the spawner box 🌟
-    drag_center_y = center_y - 80  # Shift the logical center 80 pixels higher
-    safe_drag_distance = 120       # Slightly shorter drag to stay in the safe zone
+    drag_center_y = center_y - 80 
+    safe_drag_distance = 120      
     
     bottom_y = drag_center_y + safe_drag_distance
     top_y = drag_center_y - safe_drag_distance
@@ -115,14 +191,13 @@ if __name__ == "__main__":
         # 1. نظام التحقق من المرساة البصرية (Visual Anchor Check)
         # ==========================================================
         anchor_locs, _ = ImageFinder.find_image_on_screen(
-            anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
+            anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor, threshold=0.60
         )
         
         if len(anchor_locs) > 0:
             curr_x, curr_y = anchor_locs[0]
             dist = math.hypot(curr_x - anchor_target[0], curr_y - anchor_target[1])
             
-            # 🌟 التعديل السحري: زيادة حد التسامح إلى 45 لمنع التعديلات المتكررة 🌟
             if dist > 45: 
                 print("Anchor is visibly shifted. Adjusting map securely...")
                 pyautogui.moveTo(curr_x, curr_y)
@@ -131,11 +206,10 @@ if __name__ == "__main__":
                 
                 pyautogui.moveTo(anchor_target[0], anchor_target[1], duration=0.8)
                 
-                # 🌟 تكتيك الفرامل الصلبة (Hard Brake) 🌟
-                pyautogui.sleep(0.4) # توقف تام لامتصاص الزخم
-                pyautogui.moveRel(2, 0, duration=0.1)  # حركة أفقية يمين
-                pyautogui.moveRel(-2, 0, duration=0.1) # حركة أفقية يسار
-                pyautogui.sleep(0.4) # توقف تام قبل الإفلات
+                pyautogui.sleep(0.4) 
+                pyautogui.moveRel(2, 0, duration=0.1)  
+                pyautogui.moveRel(-2, 0, duration=0.1) 
+                pyautogui.sleep(0.4) 
                 
                 pyautogui.mouseUp()
                 pyautogui.sleep(0.5)
@@ -150,7 +224,7 @@ if __name__ == "__main__":
             
             for attempt in range(10):
                 locs, _ = ImageFinder.find_image_on_screen(
-                    anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
+                    anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor, threshold=0.60
                 )
                 if len(locs) > 0:
                     print("Anchor found! Re-centering slowly...")
@@ -161,7 +235,6 @@ if __name__ == "__main__":
                     
                     pyautogui.moveTo(anchor_target[0], anchor_target[1], duration=0.8)
                     
-                    # 🌟 تكتيك الفرامل الصلبة 🌟
                     pyautogui.sleep(0.4)
                     pyautogui.moveRel(2, 0, duration=0.1)
                     pyautogui.moveRel(-2, 0, duration=0.1)
@@ -180,7 +253,13 @@ if __name__ == "__main__":
                     pyautogui.sleep(0.5)
 
         # ==========================================================
-        # 2. نظام الدمج الأصلي
+        # 🌟 الجمع التلقائي 1: قبل الدمج (Pre-Merge Collect) 🌟
+        # ==========================================================
+        print("--- Pre-Merge Scan ---")
+        perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
+
+        # ==========================================================
+        # 2. نظام الدمج الخماسي الأصلي
         # ==========================================================
         merges_this_cycle = 0
         for target_image in image_files:
@@ -188,10 +267,7 @@ if __name__ == "__main__":
                 target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor
             )
             
-            if len(template_center_points) != 0:
-                print(f"Found {len(template_center_points)} for {os.path.basename(target_image)}")
-                
-            if len(template_center_points) > MERGE_COUNT - 1 and len(clicked_points) >= MERGE_COUNT - 1:
+            if len(template_center_points) >= MERGE_COUNT and len(clicked_points) >= MERGE_COUNT - 1:
                 merges_this_cycle += 1
                 for i in range(MERGE_COUNT):
                     start_x, start_y = template_center_points[i]
@@ -206,43 +282,22 @@ if __name__ == "__main__":
                     pyautogui.mouseUp()
                     pyautogui.sleep(0.1) 
                 
-                print("Dragging operations completed.")
+                print(f"5-Merge operations completed for {os.path.basename(target_image)}")
 
         # ==========================================================
-        # 3. نظام الجمع التلقائي (يحدث بعد الدمج وقبل التوليد)
+        # 3. معالجة التوليد وحالات الطوارئ (Idle/Gridlock)
         # ==========================================================
         if merges_this_cycle > 0:
             total_merges_pending += merges_this_cycle
+            idle_cycles = 0 
         else:
             if total_merges_pending > 0:
-                print("Board cleared! Collecting items before spawning...")
-                collect_files = get_image_file_paths('collect')
-                collected_something = False
-                
-                if collect_files:
-                    for collect_img in collect_files:
-                        locs, _ = ImageFinder.find_image_on_screen(
-                            collect_img, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.85
-                        )
-                        for loc in locs:
-                            curr_x, curr_y = loc
-                            pyautogui.moveTo(curr_x, curr_y)
-                            pyautogui.mouseDown()
-                            pyautogui.moveTo(curr_x + 2, curr_y + 2, duration=0.05)
-                            pyautogui.mouseUp()
-                            pyautogui.sleep(0.1)
-                            collected_something = True
-                            
-                    if collected_something:
-                        print("Collection round finished.")
-                    else:
-                        print("Nothing to collect this round.")
-                else:
-                    print("No images found in 'collect' folder.")
-                
                 # ==========================================================
-                # 4. نظام التوليد (Spawning)
+                # 🌟 الجمع التلقائي 2: بعد الدمج وقبل التوليد (Post-Merge Collect) 🌟
                 # ==========================================================
+                print("--- Post-Merge Scan ---")
+                perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
+                
                 clicks_needed = total_merges_pending * 3
                 print(f"Spawning {clicks_needed} new items...")
                 
@@ -256,6 +311,44 @@ if __name__ == "__main__":
                 
                 pyautogui.sleep(0.5)
                 total_merges_pending = 0
+                idle_cycles = 0 
             else:
-                print("Waiting for crops to grow...")
-                time.sleep(2)
+                idle_cycles += 1
+                
+                if idle_cycles == 2:
+                    print("Gridlock detected! Attempting a 3-merge for low-tier items...")
+                    performed_emergency_merge = False
+                    
+                    low_tier_files = [f for f in image_files if '1.' in f.lower() or '2.' in f.lower()]
+                    
+                    for target_image in low_tier_files:
+                        locs, _ = ImageFinder.find_image_on_screen(
+                            target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor
+                        )
+                        
+                        if len(locs) >= 3:
+                            print(f"Executing emergency 3-merge for {os.path.basename(target_image)}")
+                            for i in range(3):
+                                start_x, start_y = locs[i]
+                                end_x, end_y = clicked_points[i % 2] 
+                                
+                                pyautogui.mouseUp()
+                                pyautogui.moveTo(start_x, start_y)
+                                pyautogui.mouseDown()
+                                pyautogui.moveTo(start_x + 3, start_y + 3, duration=0.05)
+                                pyautogui.sleep(0.05)
+                                pyautogui.moveTo(end_x, end_y, duration=0.15)
+                                pyautogui.mouseUp()
+                                pyautogui.sleep(0.1)
+                                
+                            performed_emergency_merge = True
+                            total_merges_pending += 1 
+                            idle_cycles = 0 
+                            break 
+                            
+                    if not performed_emergency_merge:
+                        print("No low-tier 3-merges available. Waiting for crops...")
+                        time.sleep(2)
+                else:
+                    print(f"Waiting for crops to grow... (Idle count: {idle_cycles})")
+                    time.sleep(2)
