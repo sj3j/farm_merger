@@ -11,12 +11,10 @@ import math
 
 # =====================================================================
 # 🌟 قاموس التتابعات (COLLECT SEQUENCES) 🌟
-# هنا تحدد ما هي الأزرار التي يجب الضغط عليها بعد جمع عنصر معين.
-# (يجب أن تكون صور الأزرار محفوظة داخل مجلد collect بنفس هذه الأسماء)
 # =====================================================================
 COLLECT_SEQUENCES = {
-    #"check": ["confirm.png"],
-    "exclamation": ["make.png","check.png","claim.png","exclamation.png","make.png", "close.png"]
+    "coin": ["confirm.png"],
+    "exclamation": ["make.png", "exclamation.png", "make.png", "check.png", "close.png"]
 }
 
 # Set up argument parser
@@ -69,16 +67,12 @@ def get_image_file_paths(folder_name='img'):
     return image_files
 
 
-# =====================================================================
-# 🌟 دالة الجمع التلقائي الذكية (تتعرف على التتابعات) 🌟
-# =====================================================================
 def perform_auto_collect(start_x, start_y, end_x, end_y, base_dir):
     collect_files = get_image_file_paths('collect')
     if not collect_files:
         print("No images found in 'collect' folder.")
         return False
         
-    # جمع أسماء صور الخطوات (مثل confirm.png) لتجاهلها في البحث الأساسي
     sequence_steps = []
     for steps in COLLECT_SEQUENCES.values():
         sequence_steps.extend(steps)
@@ -88,10 +82,10 @@ def perform_auto_collect(start_x, start_y, end_x, end_y, base_dir):
     for collect_img in collect_files:
         base_name = os.path.basename(collect_img).lower()
         
-        # تخطي أزرار الخطوات (لا تنقر على confirm العشوائي قبل أن تنقر على العملة)
         if base_name in sequence_steps:
             continue
             
+        # استخدام حجم 100% لصور الجمع لأنك التقطتها بنفسك
         locs, _ = ImageFinder.find_image_on_screen(
             collect_img, start_x, start_y, end_x, end_y, resize_factor=1.0, threshold=0.75
         )
@@ -102,20 +96,18 @@ def perform_auto_collect(start_x, start_y, end_x, end_y, base_dir):
             pyautogui.mouseDown()
             pyautogui.moveTo(curr_x + 2, curr_y + 2, duration=0.05)
             pyautogui.mouseUp()
-            pyautogui.sleep(0.5) # انتظار ظهور النافذة المنبثقة
+            pyautogui.sleep(0.5) 
             collected_something = True
             print(f"[Collect] Picked up: {base_name}")
             
-            # فحص ما إذا كان هذا العنصر يحتاج إلى خطوات إضافية (تتابع)
             for key, steps in COLLECT_SEQUENCES.items():
-                if key in base_name: # مثلاً إذا كان اسم الملف "coin1.png" فهو يتطابق مع مفتاح "coin"
+                if key in base_name: 
                     for step_img_name in steps:
                         step_path = os.path.join(base_dir, 'collect', step_img_name)
                         if not os.path.exists(step_path):
                             print(f"[Warning] Missing sequence image: {step_img_name}")
                             continue
                             
-                        # البحث عن زر الخطوة (مثل confirm.png) لمدة تصل إلى ثانيتين
                         print(f"   -> Waiting for sequence step: {step_img_name}...")
                         for attempt in range(4): 
                             step_locs, _ = ImageFinder.find_image_on_screen(
@@ -127,7 +119,7 @@ def perform_auto_collect(start_x, start_y, end_x, end_y, base_dir):
                                 pyautogui.mouseDown()
                                 pyautogui.moveTo(sx + 2, sy + 2, duration=0.05)
                                 pyautogui.mouseUp()
-                                pyautogui.sleep(0.5) # انتظار استجابة الزر
+                                pyautogui.sleep(0.5) 
                                 print(f"   -> Clicked: {step_img_name}")
                                 break
                             pyautogui.sleep(0.5)
@@ -156,7 +148,6 @@ if __name__ == "__main__":
         print("Please save a screenshot of your decoration as 'anchor.png'.\n")
         os._exit(1)
 
-    # Setup Sequence
     screen_start_x, screen_start_y, screen_end_x, screen_end_y = get_screen_area()
     anchor_target = get_anchor_point()
     clicked_points = get_merge_points(MERGE_COUNT - 1)
@@ -188,10 +179,10 @@ if __name__ == "__main__":
     
     while True:
         # ==========================================================
-        # 1. نظام التحقق من المرساة البصرية (Visual Anchor Check)
+        # 1. نظام التحقق من المرساة الأساسي (ثابت على حجم 1.0)
         # ==========================================================
         anchor_locs, _ = ImageFinder.find_image_on_screen(
-            anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor, threshold=0.60
+            anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
         )
         
         if len(anchor_locs) > 0:
@@ -203,19 +194,15 @@ if __name__ == "__main__":
                 pyautogui.moveTo(curr_x, curr_y)
                 pyautogui.mouseDown()
                 pyautogui.sleep(0.1) 
-                
                 pyautogui.moveTo(anchor_target[0], anchor_target[1], duration=0.8)
-                
                 pyautogui.sleep(0.4) 
                 pyautogui.moveRel(2, 0, duration=0.1)  
                 pyautogui.moveRel(-2, 0, duration=0.1) 
                 pyautogui.sleep(0.4) 
-                
                 pyautogui.mouseUp()
                 pyautogui.sleep(0.5)
         else:
             print("Anchor lost! Initiating Search Protocol (Looking Downwards)...")
-            
             pyautogui.moveTo(center_x, top_y)
             pyautogui.mouseDown()
             pyautogui.moveTo(center_x, bottom_y, duration=0.4) 
@@ -223,8 +210,9 @@ if __name__ == "__main__":
             pyautogui.sleep(1.5)
             
             for attempt in range(10):
+                # البحث عن المرساة هنا أيضاً مثبت على حجم 1.0
                 locs, _ = ImageFinder.find_image_on_screen(
-                    anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor, threshold=0.60
+                    anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
                 )
                 if len(locs) > 0:
                     print("Anchor found! Re-centering slowly...")
@@ -232,14 +220,11 @@ if __name__ == "__main__":
                     pyautogui.moveTo(curr_x, curr_y)
                     pyautogui.mouseDown()
                     pyautogui.sleep(0.1)
-                    
                     pyautogui.moveTo(anchor_target[0], anchor_target[1], duration=0.8)
-                    
                     pyautogui.sleep(0.4)
                     pyautogui.moveRel(2, 0, duration=0.1)
                     pyautogui.moveRel(-2, 0, duration=0.1)
                     pyautogui.sleep(0.4)
-                    
                     pyautogui.mouseUp()
                     pyautogui.sleep(0.5)
                     break
@@ -253,25 +238,71 @@ if __name__ == "__main__":
                     pyautogui.sleep(0.5)
 
         # ==========================================================
-        # 🌟 الجمع التلقائي 1: قبل الدمج (Pre-Merge Collect) 🌟
+        # 2. الجمع التلقائي (قبل الدمج) ونقطة التفتيش
         # ==========================================================
         print("--- Pre-Merge Scan ---")
         perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
 
+        # نقطة التفتيش مثبتة على حجم 1.0
+        anchor_locs, _ = ImageFinder.find_image_on_screen(
+            anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
+        )
+        if len(anchor_locs) > 0:
+            curr_x, curr_y = anchor_locs[0]
+            dist = math.hypot(curr_x - anchor_target[0], curr_y - anchor_target[1])
+            if dist > 45: 
+                print("--- Quick Anchor Re-Check: Fixing shift caused by collecting ---")
+                pyautogui.moveTo(curr_x, curr_y)
+                pyautogui.mouseDown()
+                pyautogui.sleep(0.1) 
+                pyautogui.moveTo(anchor_target[0], anchor_target[1], duration=0.6) 
+                pyautogui.sleep(0.4) 
+                pyautogui.moveRel(2, 0, duration=0.1)  
+                pyautogui.moveRel(-2, 0, duration=0.1) 
+                pyautogui.sleep(0.4) 
+                pyautogui.mouseUp()
+                pyautogui.sleep(0.2)
+
         # ==========================================================
-        # 2. نظام الدمج الخماسي الأصلي
+        # 3. 🌟 نظام الدمج الخماسي (التوجيه الذكي بالمسافات) 🌟
         # ==========================================================
         merges_this_cycle = 0
         for target_image in image_files:
+            # هنا نستخدم resize_factor الديناميكي لأن المحاصيل من المستودع
             template_center_points, modified_screenshot = ImageFinder.find_image_on_screen(
                 target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor
             )
             
             if len(template_center_points) >= MERGE_COUNT and len(clicked_points) >= MERGE_COUNT - 1:
                 merges_this_cycle += 1
-                for i in range(MERGE_COUNT):
-                    start_x, start_y = template_center_points[i]
-                    end_x, end_y = clicked_points[i % (MERGE_COUNT - 1)]
+                
+                available_targets = list(clicked_points[:MERGE_COUNT - 1])
+                available_sources = list(template_center_points[:MERGE_COUNT])
+                drag_sequence = []
+                
+                while available_targets:
+                    best_dist = float('inf')
+                    best_pair = None
+                    
+                    for t_idx, tgt in enumerate(available_targets):
+                        for s_idx, src in enumerate(available_sources):
+                            dist = math.hypot(tgt[0] - src[0], tgt[1] - src[1])
+                            if dist < best_dist:
+                                best_dist = dist
+                                best_pair = (s_idx, t_idx)
+                                
+                    s_idx, t_idx = best_pair
+                    src = available_sources.pop(s_idx)
+                    tgt = available_targets.pop(t_idx)
+                    drag_sequence.append((src, tgt))
+                    
+                trigger_src = available_sources[0]
+                trigger_tgt = clicked_points[0]
+                drag_sequence.append((trigger_src, trigger_tgt))
+                
+                for start_pos, end_pos in drag_sequence:
+                    start_x, start_y = start_pos
+                    end_x, end_y = end_pos
                     
                     pyautogui.mouseUp()
                     pyautogui.moveTo(start_x, start_y)
@@ -282,19 +313,16 @@ if __name__ == "__main__":
                     pyautogui.mouseUp()
                     pyautogui.sleep(0.1) 
                 
-                print(f"5-Merge operations completed for {os.path.basename(target_image)}")
+                print(f"Smart 5-Merge operations completed for {os.path.basename(target_image)}")
 
         # ==========================================================
-        # 3. معالجة التوليد وحالات الطوارئ (Idle/Gridlock)
+        # 4. معالجة التوليد وحالات الطوارئ (Idle/Gridlock)
         # ==========================================================
         if merges_this_cycle > 0:
             total_merges_pending += merges_this_cycle
             idle_cycles = 0 
         else:
             if total_merges_pending > 0:
-                # ==========================================================
-                # 🌟 الجمع التلقائي 2: بعد الدمج وقبل التوليد (Post-Merge Collect) 🌟
-                # ==========================================================
                 print("--- Post-Merge Scan ---")
                 perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
                 
@@ -316,7 +344,7 @@ if __name__ == "__main__":
                 idle_cycles += 1
                 
                 if idle_cycles == 2:
-                    print("Gridlock detected! Attempting a 3-merge for low-tier items...")
+                    print("Gridlock detected! Attempting a Smart 3-merge for low-tier items...")
                     performed_emergency_merge = False
                     
                     low_tier_files = [f for f in image_files if '1.' in f.lower() or '2.' in f.lower()]
@@ -327,10 +355,29 @@ if __name__ == "__main__":
                         )
                         
                         if len(locs) >= 3:
-                            print(f"Executing emergency 3-merge for {os.path.basename(target_image)}")
-                            for i in range(3):
-                                start_x, start_y = locs[i]
-                                end_x, end_y = clicked_points[i % 2] 
+                            print(f"Executing Smart emergency 3-merge for {os.path.basename(target_image)}")
+                            
+                            avail_targets_3m = list(clicked_points[:2])
+                            avail_sources_3m = list(locs[:3])
+                            drag_seq_3m = []
+                            
+                            while avail_targets_3m:
+                                b_dist = float('inf')
+                                b_pair = None
+                                for t_i, tgt in enumerate(avail_targets_3m):
+                                    for s_i, src in enumerate(avail_sources_3m):
+                                        dist = math.hypot(tgt[0] - src[0], tgt[1] - src[1])
+                                        if dist < b_dist:
+                                            b_dist = dist
+                                            b_pair = (s_i, t_i)
+                                s_i, t_i = b_pair
+                                drag_seq_3m.append((avail_sources_3m.pop(s_i), avail_targets_3m.pop(t_i)))
+                                
+                            drag_seq_3m.append((avail_sources_3m[0], clicked_points[0]))
+                            
+                            for start_pos, end_pos in drag_seq_3m:
+                                start_x, start_y = start_pos
+                                end_x, end_y = end_pos
                                 
                                 pyautogui.mouseUp()
                                 pyautogui.moveTo(start_x, start_y)
