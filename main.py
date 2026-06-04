@@ -13,7 +13,7 @@ import math
 # 🌟 قاموس التتابعات (COLLECT SEQUENCES) 🌟
 # =====================================================================
 COLLECT_SEQUENCES = {
-    "coin": ["confirm.png"],
+    "exclamation1": ["make.png", "exclamation1.png", "make.png", "check.png", "close.png"],
     "exclamation": ["make.png", "exclamation.png", "make.png", "check.png", "close.png"]
 }
 
@@ -85,9 +85,8 @@ def perform_auto_collect(start_x, start_y, end_x, end_y, base_dir):
         if base_name in sequence_steps:
             continue
             
-        # استخدام حجم 100% لصور الجمع لأنك التقطتها بنفسك
         locs, _ = ImageFinder.find_image_on_screen(
-            collect_img, start_x, start_y, end_x, end_y, resize_factor=1.0, threshold=0.75
+            collect_img, start_x, start_y, end_x, end_y, resize_factor=1.0, threshold=0.80
         )
         
         for loc in locs:
@@ -179,7 +178,7 @@ if __name__ == "__main__":
     
     while True:
         # ==========================================================
-        # 1. نظام التحقق من المرساة الأساسي (ثابت على حجم 1.0)
+        # 1. نظام التحقق من المرساة الأساسي
         # ==========================================================
         anchor_locs, _ = ImageFinder.find_image_on_screen(
             anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
@@ -210,7 +209,6 @@ if __name__ == "__main__":
             pyautogui.sleep(1.5)
             
             for attempt in range(10):
-                # البحث عن المرساة هنا أيضاً مثبت على حجم 1.0
                 locs, _ = ImageFinder.find_image_on_screen(
                     anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
                 )
@@ -243,7 +241,6 @@ if __name__ == "__main__":
         print("--- Pre-Merge Scan ---")
         perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
 
-        # نقطة التفتيش مثبتة على حجم 1.0
         anchor_locs, _ = ImageFinder.find_image_on_screen(
             anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
         )
@@ -268,13 +265,21 @@ if __name__ == "__main__":
         # ==========================================================
         merges_this_cycle = 0
         for target_image in image_files:
-            # هنا نستخدم resize_factor الديناميكي لأن المحاصيل من المستودع
             template_center_points, modified_screenshot = ImageFinder.find_image_on_screen(
                 target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor
             )
             
             if len(template_center_points) >= MERGE_COUNT and len(clicked_points) >= MERGE_COUNT - 1:
                 merges_this_cycle += 1
+                
+                # 🌟 التعديل الجديد: النقر لتنظيف خانات الدمج قبل السحب (Pre-Merge Site Prep) 🌟
+                for tgt_x, tgt_y in clicked_points[:MERGE_COUNT - 1]:
+                    pyautogui.moveTo(tgt_x, tgt_y)
+                    pyautogui.mouseDown()
+                    pyautogui.moveTo(tgt_x + 2, tgt_y + 2, duration=0.05)
+                    pyautogui.mouseUp()
+                    pyautogui.sleep(0.05)
+                pyautogui.sleep(0.1) # استراحة قصيرة قبل بدء دمج العناصر
                 
                 available_targets = list(clicked_points[:MERGE_COUNT - 1])
                 available_sources = list(template_center_points[:MERGE_COUNT])
@@ -356,6 +361,15 @@ if __name__ == "__main__":
                         
                         if len(locs) >= 3:
                             print(f"Executing Smart emergency 3-merge for {os.path.basename(target_image)}")
+                            
+                            # 🌟 التعديل الجديد: النقر لتنظيف خانات الدمج الثلاثي قبل السحب 🌟
+                            for tgt_x, tgt_y in clicked_points[:2]:
+                                pyautogui.moveTo(tgt_x, tgt_y)
+                                pyautogui.mouseDown()
+                                pyautogui.moveTo(tgt_x + 2, tgt_y + 2, duration=0.05)
+                                pyautogui.mouseUp()
+                                pyautogui.sleep(0.05)
+                            pyautogui.sleep(0.1)
                             
                             avail_targets_3m = list(clicked_points[:2])
                             avail_sources_3m = list(locs[:3])
