@@ -1,6 +1,7 @@
 from item_finder import ImageFinder
 from screen_area_selector import ScreenAreaSelector
 from merging_points_selector import MergingPointsSelector
+from time_skipper import skip_time_4h
 import os
 import time
 import pyautogui
@@ -13,8 +14,15 @@ import math
 # 🌟 قاموس التتابعات (COLLECT SEQUENCES) 🌟
 # =====================================================================
 COLLECT_SEQUENCES = {
-    "exclamation": ["make.png", "exclamation1.png", "make.png", "check.png", "close.png"]
+    "exclamation": ["make.png", "free.png", "exclamation1.png", "make.png", "check.png","claim.png", "close.png"]
 }
+
+# =====================================================================
+# 🌟 إعدادات طوارئ الدمج الثلاثي (EMERGENCY MERGE TIERS) 🌟
+# =====================================================================
+# هنا تحدد المستويات المسموح للبوت بدمجها (3 حبات) عند ازدحام اللوحة.
+# يمكنك إضافة '3.' أو '4.' إذا أردت السماح بدمج مستويات أعلى في وقت الطوارئ.
+ALLOWED_EMERGENCY_TIERS = ['1.', '2.', '3.']  # مثال: ['1.', '2.', '3.'] للسماح فقط بالمستويات 1، 2، و3 في الدمج الطارئ
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Farm Merge Clicker')
@@ -145,6 +153,11 @@ if __name__ == "__main__":
         print("\n[ERROR] 'anchor.png' not found in 'img' folder!")
         print("Please save a screenshot of your decoration as 'anchor.png'.\n")
         os._exit(1)
+        
+    img2_dir = os.path.join(base_dir, 'img2')
+    if not os.path.exists(img2_dir):
+        os.makedirs(img2_dir)
+        print("Created 'img2' folder for 1.0 resize items.")
 
     screen_start_x, screen_start_y, screen_end_x, screen_end_y = get_screen_area()
     anchor_target = get_anchor_point()
@@ -157,9 +170,12 @@ if __name__ == "__main__":
 
     if resize_factor is None:
         resize_factor = ImageFinder.find_best_resize_factor((screen_start_x, screen_start_y, screen_end_x, screen_end_y))
-    print(f"Using resize factor: {resize_factor}")
+    print(f"Using dynamic resize factor: {resize_factor}")
 
-    image_files = get_image_file_paths('img')
+    image_files_dynamic = get_image_file_paths('img')
+    image_files_static = get_image_file_paths('img2')
+    
+    all_merge_targets = [(f, resize_factor) for f in image_files_dynamic] + [(f, 1.0) for f in image_files_static]
     
     total_merges_pending = 0
     idle_cycles = 0
@@ -187,7 +203,7 @@ if __name__ == "__main__":
             curr_x, curr_y = anchor_locs[0]
             dist = math.hypot(curr_x - anchor_target[0], curr_y - anchor_target[1])
             
-            if dist > 45: 
+            if dist > 25: 
                 print("Anchor is visibly shifted. Adjusting map securely...")
                 pyautogui.moveTo(curr_x, curr_y)
                 pyautogui.mouseDown()
@@ -241,7 +257,7 @@ if __name__ == "__main__":
         perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
 
         anchor_locs, _ = ImageFinder.find_image_on_screen(
-            anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.60
+            anchor_img_path, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor=1.0, threshold=0.75
         )
         if len(anchor_locs) > 0:
             curr_x, curr_y = anchor_locs[0]
@@ -260,25 +276,28 @@ if __name__ == "__main__":
                 pyautogui.sleep(0.2)
 
         # ==========================================================
-        # 3. 🌟 نظام الدمج الخماسي (التوجيه الذكي بالمسافات) 🌟
+        # 3. 🌟 نظام الدمج الخماسي 🌟
         # ==========================================================
         merges_this_cycle = 0
-        for target_image in image_files:
+        site_prepped = False
+        
+        for target_image, current_resize_factor in all_merge_targets:
             template_center_points, modified_screenshot = ImageFinder.find_image_on_screen(
-                target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor
+                target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, current_resize_factor
             )
             
             if len(template_center_points) >= MERGE_COUNT and len(clicked_points) >= MERGE_COUNT - 1:
                 merges_this_cycle += 1
                 
-                # 🌟 التعديل الجديد: النقر لتنظيف خانات الدمج قبل السحب (Pre-Merge Site Prep) 🌟
-                for tgt_x, tgt_y in clicked_points[:MERGE_COUNT - 1]:
-                    pyautogui.moveTo(tgt_x, tgt_y)
-                    pyautogui.mouseDown()
-                    pyautogui.moveTo(tgt_x + 2, tgt_y + 2, duration=0.05)
-                    pyautogui.mouseUp()
-                    pyautogui.sleep(0.05)
-                pyautogui.sleep(0.1) # استراحة قصيرة قبل بدء دمج العناصر
+                if not site_prepped:
+                    for tgt_x, tgt_y in clicked_points[:MERGE_COUNT - 1]:
+                        pyautogui.moveTo(tgt_x, tgt_y)
+                        pyautogui.mouseDown()
+                        pyautogui.moveTo(tgt_x + 2, tgt_y + 2, duration=0.05)
+                        pyautogui.mouseUp()
+                        pyautogui.sleep(0.05)
+                    pyautogui.sleep(0.1) 
+                    site_prepped = True  
                 
                 available_targets = list(clicked_points[:MERGE_COUNT - 1])
                 available_sources = list(template_center_points[:MERGE_COUNT])
@@ -325,12 +344,14 @@ if __name__ == "__main__":
         if merges_this_cycle > 0:
             total_merges_pending += merges_this_cycle
             idle_cycles = 0 
+            skip_time_4h()
+            time.sleep(5)
         else:
             if total_merges_pending > 0:
                 print("--- Post-Merge Scan ---")
                 perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
                 
-                clicks_needed = total_merges_pending * 3
+                clicks_needed = total_merges_pending * 6
                 print(f"Spawning {clicks_needed} new items...")
                 
                 pyautogui.mouseUp()
@@ -341,27 +362,27 @@ if __name__ == "__main__":
                     pyautogui.mouseUp()
                     pyautogui.sleep(0.1)  
                 
-                pyautogui.sleep(0.5)
+                pyautogui.sleep(0.1)
                 total_merges_pending = 0
                 idle_cycles = 0 
             else:
                 idle_cycles += 1
                 
-                if idle_cycles == 2:
-                    print("Gridlock detected! Attempting a Smart 3-merge for low-tier items...")
+                if idle_cycles == 1:
+                    print(f"Gridlock detected! Attempting a Smart 3-merge for tiers: {ALLOWED_EMERGENCY_TIERS}...")
                     performed_emergency_merge = False
                     
-                    low_tier_files = [f for f in image_files if '1.' in f.lower() or '2.' in f.lower()]
+                    # 🌟 تم ربط الفلترة بقائمة التحكم التي حددناها في الأعلى 🌟
+                    low_tier_targets = [(f, factor) for f, factor in all_merge_targets if any(tier in f.lower() for tier in ALLOWED_EMERGENCY_TIERS)]
                     
-                    for target_image in low_tier_files:
+                    for target_image, current_resize_factor in low_tier_targets:
                         locs, _ = ImageFinder.find_image_on_screen(
-                            target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, resize_factor
+                            target_image, screen_start_x, screen_start_y, screen_end_x, screen_end_y, current_resize_factor
                         )
                         
                         if len(locs) >= 3:
                             print(f"Executing Smart emergency 3-merge for {os.path.basename(target_image)}")
                             
-                            # 🌟 التعديل الجديد: النقر لتنظيف خانات الدمج الثلاثي قبل السحب 🌟
                             for tgt_x, tgt_y in clicked_points[:2]:
                                 pyautogui.moveTo(tgt_x, tgt_y)
                                 pyautogui.mouseDown()
@@ -407,8 +428,10 @@ if __name__ == "__main__":
                             break 
                             
                     if not performed_emergency_merge:
-                        print("No low-tier 3-merges available. Waiting for crops...")
-                        time.sleep(2)
+                        print("No 3-merges available for specified tiers. Activating Time-Skip...")
+                        skip_time_4h()
+                        time.sleep(5)
                 else:
                     print(f"Waiting for crops to grow... (Idle count: {idle_cycles})")
-                    time.sleep(2)
+                    skip_time_4h()
+                    time.sleep(5)
