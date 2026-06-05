@@ -1,7 +1,7 @@
 from item_finder import ImageFinder
 from screen_area_selector import ScreenAreaSelector
 from merging_points_selector import MergingPointsSelector
-from time_skipper import skip_time_4h
+from time_skipper import jump_forward_4h, revert_to_real_time # 🌟 التحديث هنا
 import os
 import time
 import pyautogui
@@ -14,15 +14,19 @@ import math
 # 🌟 قاموس التتابعات (COLLECT SEQUENCES) 🌟
 # =====================================================================
 COLLECT_SEQUENCES = {
-    "exclamation": ["make.png", "free.png", "exclamation1.png", "make.png", "check.png","claim.png", "close.png"]
+    "sell": ["exclamation.png", "make.png", "exclamation.png", "make.png", "check.png","claim.png", "close.png"],
+    "check2": ["check3.png", "claim.png", "close.png"],
+    "gem": ["free.png", "close.png"],
+    "gemcheck": ["free.png", "close.png"],
+    "wrenchbox": ["open.png"],
+    "fbox3": ["open.png", "close.png"],
+    "free": ["close.png"],
 }
 
 # =====================================================================
 # 🌟 إعدادات طوارئ الدمج الثلاثي (EMERGENCY MERGE TIERS) 🌟
 # =====================================================================
-# هنا تحدد المستويات المسموح للبوت بدمجها (3 حبات) عند ازدحام اللوحة.
-# يمكنك إضافة '3.' أو '4.' إذا أردت السماح بدمج مستويات أعلى في وقت الطوارئ.
-ALLOWED_EMERGENCY_TIERS = ['1.', '2.', '3.']  # مثال: ['1.', '2.', '3.'] للسماح فقط بالمستويات 1، 2، و3 في الدمج الطارئ
+ALLOWED_EMERGENCY_TIERS = ['1.', '2.', '3.']  
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Farm Merge Clicker')
@@ -93,7 +97,7 @@ def perform_auto_collect(start_x, start_y, end_x, end_y, base_dir):
             continue
             
         locs, _ = ImageFinder.find_image_on_screen(
-            collect_img, start_x, start_y, end_x, end_y, resize_factor=1.0, threshold=0.80
+            collect_img, start_x, start_y, end_x, end_y, resize_factor=1.0, threshold=0.85
         )
         
         for loc in locs:
@@ -191,6 +195,9 @@ if __name__ == "__main__":
 
     print("Bot is now running...")
     
+    # 🌟 متغير لمعرفة ما إذا كان الزمن حالياً في المستقبل أم لا 🌟
+    time_is_forward = False 
+    
     while True:
         # ==========================================================
         # 1. نظام التحقق من المرساة الأساسي
@@ -251,7 +258,15 @@ if __name__ == "__main__":
                     pyautogui.sleep(0.5)
 
         # ==========================================================
-        # 2. الجمع التلقائي (قبل الدمج) ونقطة التفتيش
+        # 🌟 إرجاع الزمن للحقيقي (قبل الجمع) لتخطي حماية اللعبة 🌟
+        # ==========================================================
+        if time_is_forward:
+            time.sleep(7) # ثانية ليتزامن المتصفح مع الوقت الجديد قبل النقر
+            revert_to_real_time()
+            time_is_forward = False
+
+        # ==========================================================
+        # 2. الجمع التلقائي ونقطة التفتيش
         # ==========================================================
         print("--- Pre-Merge Scan ---")
         perform_auto_collect(screen_start_x, screen_start_y, screen_end_x, screen_end_y, base_dir)
@@ -262,7 +277,7 @@ if __name__ == "__main__":
         if len(anchor_locs) > 0:
             curr_x, curr_y = anchor_locs[0]
             dist = math.hypot(curr_x - anchor_target[0], curr_y - anchor_target[1])
-            if dist > 45: 
+            if dist > 25: 
                 print("--- Quick Anchor Re-Check: Fixing shift caused by collecting ---")
                 pyautogui.moveTo(curr_x, curr_y)
                 pyautogui.mouseDown()
@@ -344,8 +359,12 @@ if __name__ == "__main__":
         if merges_this_cycle > 0:
             total_merges_pending += merges_this_cycle
             idle_cycles = 0 
-            skip_time_4h()
+            
+            # 🌟 القفز للمستقبل نهاية الدورة 🌟
+            jump_forward_4h()
+            time_is_forward = True
             time.sleep(5)
+            
         else:
             if total_merges_pending > 0:
                 print("--- Post-Merge Scan ---")
@@ -372,7 +391,6 @@ if __name__ == "__main__":
                     print(f"Gridlock detected! Attempting a Smart 3-merge for tiers: {ALLOWED_EMERGENCY_TIERS}...")
                     performed_emergency_merge = False
                     
-                    # 🌟 تم ربط الفلترة بقائمة التحكم التي حددناها في الأعلى 🌟
                     low_tier_targets = [(f, factor) for f, factor in all_merge_targets if any(tier in f.lower() for tier in ALLOWED_EMERGENCY_TIERS)]
                     
                     for target_image, current_resize_factor in low_tier_targets:
@@ -429,9 +447,13 @@ if __name__ == "__main__":
                             
                     if not performed_emergency_merge:
                         print("No 3-merges available for specified tiers. Activating Time-Skip...")
-                        skip_time_4h()
+                        # 🌟 القفز للمستقبل عند الطوارئ 🌟
+                        jump_forward_4h()
+                        time_is_forward = True
                         time.sleep(5)
                 else:
                     print(f"Waiting for crops to grow... (Idle count: {idle_cycles})")
-                    skip_time_4h()
+                    # 🌟 القفز للمستقبل عند الانتظار 🌟
+                    jump_forward_4h()
+                    time_is_forward = True
                     time.sleep(5)
